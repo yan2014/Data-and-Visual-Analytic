@@ -1,4 +1,3 @@
-#GTID: 903295488
 #1.	Professional Employment by State
 #install and load required libraries
 install.packages("ggplot2")
