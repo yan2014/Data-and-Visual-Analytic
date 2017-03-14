@@ -44,22 +44,18 @@ library(tidyr)
 The variable `Type` captures whether the row is a movie, a TV series, or a game. Remove all rows from `df` that do not correspond to movies.
 
 ```{r}
-# TODO: Remove all rows from df that do not correspond to movies
 df=df[df$Type=="movie", ]
 print(dim(df)[1])
 ```
 
 
-**Q**: How many rows are left after removal? _Enter your response below._
-
-**A**:40000 rows are left
+**Notice**:40000 rows are left
 
 ## 2. Process `Runtime` column
 
 The variable `Runtime` represents the length of the title as a string. Write R code to convert it to a numeric value (in minutes) and replace `df$Runtime` with the new numeric column.
 
 ```{r}
-# TODO: Replace df$Runtime with a numeric column containing the runtime in minutes
 df$Runtime[df$Runtime=="1 h"] <- "60 min"#change runtime 1 h to be 60 min
 df=df[df$Runtime!="N/A",]#remove columns without runtime
 df$newtime <- str_extract_all(df$Runtime,"\\(?[0-9,.]+\\)?",simplify = TRUE)#extract runtime as seperate numbers
@@ -73,7 +69,6 @@ df$Runtime <- df$finaltime#replace runtime with finaltime
 Now investigate the distribution of `Runtime` values and how it changes over years (variable `Year`, which you can bucket into decades) and in relation to the budget (variable `Budget`). Include any plots that illustrate.
 
 ```{r}
-# TODO: Investigate the distribution of Runtime values and how it varies by Year and Budget
 ggplot(data=df, aes(df$Runtime))+geom_histogram()
 summary(df$Runtime)
 ggplot(df, aes(x=df$Year, y=df$Runtime))+geom_point()
@@ -93,11 +88,7 @@ p<-ggplot(df, aes(x=Budget, y=Runtime)) +
 p+facet_wrap(~ColorYear)
 ```
 
-_Feel free to insert additional code chunks as necessary._
-
-**Q**: Comment on the distribution as well as relationships. Are there any patterns or trends that you can observe?
-
-**A**: The histogram shows that the majority of runtime was around 100 mins. Then, let's explore whether the runtime has any relationship with when the movie was made or the budget of the movie. Typically, line charts are suitable for showing trends (e.g., runtime over years). But there are lots of movies in one single year. Therefore, a scatter plot was created to show the relationship between runtime and year. The scatter plot shows that runtime was short before 1910 and it became more diverse afterward. After 1910, most movies are less than 250 mins, but a few outliers are much longer than 250 mins. As for the relationship between runtime and budget, initially, a scatter plot was created to explore the relationship. As the scatter plot shows, the runtime varies within one single budget. And the regression line did not show a clear trend. Therefore, there is no strong relationship between runtime and budget. But let's dig more into it and see whether there is any relationship for different time period. Therefore, I created separate scatter plots and regression lines for each time period (1888-1970, 1970-1980, 1980-1990, 1990-2000, 2000-2010, 2010-2018). During 1888-1970, the budget range was smaller and we can see a clear trend of "larger budget~longer runtime". During 1980-1990, sometimes shorter runtime could be associated with a larger budget. During other time periods, the trend is not strong, but we can still see a trend of "larger budget~longer runtime".
+**Notice**: The histogram shows that the majority of runtime was around 100 mins. Then, let's explore whether the runtime has any relationship with when the movie was made or the budget of the movie. Typically, line charts are suitable for showing trends (e.g., runtime over years). But there are lots of movies in one single year. Therefore, a scatter plot was created to show the relationship between runtime and year. The scatter plot shows that runtime was short before 1910 and it became more diverse afterward. After 1910, most movies are less than 250 mins, but a few outliers are much longer than 250 mins. As for the relationship between runtime and budget, initially, a scatter plot was created to explore the relationship. As the scatter plot shows, the runtime varies within one single budget. And the regression line did not show a clear trend. Therefore, there is no strong relationship between runtime and budget. But let's dig more into it and see whether there is any relationship for different time period. Therefore, I created separate scatter plots and regression lines for each time period (1888-1970, 1970-1980, 1980-1990, 1990-2000, 2000-2010, 2010-2018). During 1888-1970, the budget range was smaller and we can see a clear trend of "larger budget~longer runtime". During 1980-1990, sometimes shorter runtime could be associated with a larger budget. During other time periods, the trend is not strong, but we can still see a trend of "larger budget~longer runtime".
 
 ## 3. Encode `Genre` column
 
@@ -106,7 +97,6 @@ The column `Genre` represents a list of genres associated with the movie in a st
 For example, if there are a total of 3 genres: Drama, Comedy, and Action, a movie that is both Action and Comedy should be represented by a binary vector <0, 1, 1>. Note that you need to first compile a dictionary of all possible genres and then figure out which movie has which genres (you can use the R `tm` package to create the dictionary).
 
 ```{r}
-# TODO: Replace Genre with a collection of binary columns
 myCorpus <- Corpus(VectorSource(df$Genre))
 myTDM <- DocumentTermMatrix(myCorpus)
 myTDMmatrix <- as.matrix(myTDM)
@@ -116,7 +106,6 @@ df$Genre <- myTDMmatrix #replace the column Genre
 Plot the relative proportions of movies having the top 10 most common genres.
 
 ```{r}
-# TODO: Select movies from top 10 most common genres and plot their relative proportions
 # get top 10 generas
 freq <- colSums(as.matrix(myTDM))
 freq
@@ -137,7 +126,6 @@ ggplot(frematrix, aes(x=topgenre, y=frequencygenre))+geom_bar(stat ="identity")
 Examine how the distribution of `Runtime` changes across genres for the top 10 most common genres.
 
 ```{r}
-# TODO: Plot Runtime distribution for top 10 most common genres
 subset1 <- subset(df, df$Genre[,6]==1)#1drama
 subset2 <- subset(df, df$Genre[,8]==1)#2comedy
 subset3 <- subset(df, df$Genre[,4]==1)#3short
@@ -162,9 +150,7 @@ ggplot(data=subset9, aes(subset9$Runtime))+geom_histogram()
 ggplot(data=subset10, aes(subset10$Runtime))+geom_histogram()
 ```
 
-**Q**: Describe the interesting relationship(s) you observe. Are there any expected or unexpected trends that are evident?
-
-**A**: Drama: median is 96 and mean is 96.94; Comedy: median is 90 and mean is 79; Short:median is 11 and mean is 13.92; Romance: median is 96 and mean is 98; Action: median is 95 and mean is 98.8; Crime: median is 95 and mean is 95.9; Thriller: median is 95 and mean is 96.4; Documentary: median is 73 and mean is 67.52; Adventure: median is 95 and mean is 99; Animation median is 7 and mean is 20.8. 1) Animation stood up for the fact that the mean was much greater than the median. The last histogram also showed a right skewed distribution. It represented that the runtime of most animations was short.  2) Histograms showed that the peak of the following genres is around 100 min: drama, comedy, romance, action, crime, thriller, and adventure. 3) Comedy stood up for the fact that the median was much greater than the mean. The histogram also showed a left skewed distribution.  One unexpected trend was that the animation is shorter than the short movie. 
+**Notice**: Drama: median is 96 and mean is 96.94; Comedy: median is 90 and mean is 79; Short:median is 11 and mean is 13.92; Romance: median is 96 and mean is 98; Action: median is 95 and mean is 98.8; Crime: median is 95 and mean is 95.9; Thriller: median is 95 and mean is 96.4; Documentary: median is 73 and mean is 67.52; Adventure: median is 95 and mean is 99; Animation median is 7 and mean is 20.8. 1) Animation stood up for the fact that the mean was much greater than the median. The last histogram also showed a right skewed distribution. It represented that the runtime of most animations was short.  2) Histograms showed that the peak of the following genres is around 100 min: drama, comedy, romance, action, crime, thriller, and adventure. 3) Comedy stood up for the fact that the median was much greater than the mean. The histogram also showed a left skewed distribution.  One unexpected trend was that the animation is shorter than the short movie. 
 
 ## 4. Eliminate mismatched rows
 
@@ -173,7 +159,6 @@ The dataframe was put together by merging two different sources of data and it i
 Find and remove all rows where you suspect a merge error occurred based on a mismatch between these two variables. To make sure subsequent analysis and modeling work well, avoid removing more than 10% of the rows that have a `Gross` value present.
 
 ```{r}
-# TODO: Remove rows with Released-Year mismatch
 countGross = sum(!is.na(df$Gross))#number of rows that has Gross value
 countGross #4520 rows has gross value
 limitation = countGross*0.1
@@ -183,9 +168,7 @@ countGrossMatch = sum(!is.na(subsetmatch$Gross))
 countGrossMatch #4397 has gross value, so there are 4520-4397 rows are deleted
 ```
 
-**Q**: What is your precise removal logic and how many rows did you end up removing?
-
-**A**: Firstly, in the df dataset, there are 4520 rows having gross value, therefore, I should avoid removing more than 452 rows. And then I created a subset out of df, it's called subsetmacth. If the difference between release year and year is less than one, then I will keep the row in the subsetmatch. Eventually, there are 32768 rows left. In addition, there are 4397 rows with the gross value in the subsetmatch. Therefore, 123 rows with gross value are removed, which is less than 452 rows. Therefore, the removing action meet the criteria.
+**Notice**: Firstly, in the df dataset, there are 4520 rows having gross value, therefore, I should avoid removing more than 452 rows. And then I created a subset out of df, it's called subsetmacth. If the difference between release year and year is less than one, then I will keep the row in the subsetmatch. Eventually, there are 32768 rows left. In addition, there are 4397 rows with the gross value in the subsetmatch. Therefore, 123 rows with gross value are removed, which is less than 452 rows. Therefore, the removing action meet the criteria.
 
 ## 5. Explore `Gross` revenue
 
@@ -194,7 +177,6 @@ For the commercial success of a movie, production houses want to maximize Gross 
 Note: To get a meaningful relationship, you may have to partition the movies into subsets such as short vs. long duration, or by genre, etc.
 
 ```{r}
-# TODO: Investigate if Gross Revenue is related to Budget, Runtime or Genre
 # gross vs budget
 p<-ggplot(subsetmatch, aes(x=Budget, y=Gross)) +
     geom_point(shape=1) +    # Use hollow circles
@@ -259,12 +241,9 @@ ggplot(subset10, aes(x=Runtime, y=Gross)) +
     geom_smooth()            # Add a loess smoothed fit curve with confidence region
 ```
 
-**Q**: Did you find any observable relationships or combinations of Budget/Runtime/Genre that result in high Gross revenue? If you divided the movies into different subsets, you may get different answers for them - point out interesting ones.
-
-**A**: The regression line shows that higher budgets potentially offer higher gross. The regression line of "budget vs runtime" does not show a clear relationship between those two variables. But after dividing runtime as longer time and shorter time periods and then plot them out, the time period between 102 to 130 has a clearer relationship between runtime and gross. It shows that longer runtime has higher gross during the particular time period. While looking at regressions lines of "gross ~ runtime" in top 10 genres, some more interesting trends come out. For short movies, gross increases sharply as runtime increases. For drama, action, crime, thriller, documentary, adventure, and animation, there is a threshold of runtime. After a threshold, gross decreases as runtime increases. 
+**Notice**: The regression line shows that higher budgets potentially offer higher gross. The regression line of "budget vs runtime" does not show a clear relationship between those two variables. But after dividing runtime as longer time and shorter time periods and then plot them out, the time period between 102 to 130 has a clearer relationship between runtime and gross. It shows that longer runtime has higher gross during the particular time period. While looking at regressions lines of "gross ~ runtime" in top 10 genres, some more interesting trends come out. For short movies, gross increases sharply as runtime increases. For drama, action, crime, thriller, documentary, adventure, and animation, there is a threshold of runtime. After a threshold, gross decreases as runtime increases. 
 
 ```{r}
-# TODO: Investigate if Gross Revenue is related to Release Month
 #create 2 dummy variables based on movie release date; one for Summer Release (movies that are released from May through August) and Christmas release (movies that are released in December). Based on our domain knowledge, we believe those two are the peak period where audiences go to the theater and big budget movies are released. 
 #plot it out
 subsetmatch$month <- as.numeric(substr(subsetmatch$Released, 6,7))#make a new column that holds the variable month
@@ -288,7 +267,6 @@ The variable `Awards` describes nominations and awards in text format. Convert i
 Note that the format of the `Awards` column is not standard; you may have to use regular expressions to find the relevant values. Try your best to process them, and you may leave the ones that don't have enough information as NAs or set them to 0s.
 
 ```{r}
-# TODO: Convert Awards to 2 numeric columns: wins and nominations
 #there are four patterns "n/Nominated for #" "# nomination" "w/Won #" "# win"
 subsetmatch$Awards[subsetmatch$Awards=="N/A"]=as.numeric(0)#deal with N/A
 sum(subsetmatch$Awards!=0) #13033
@@ -302,12 +280,9 @@ nominations=sapply(nominations, function(x) sum(as.numeric(unlist(regmatches(x,g
 subsetmatch$nominations=nominations
 ```
 
-**Q**: How did you construct your conversion mechanism? How many rows had valid/non-zero wins or nominations?
-
-**A**: There are 13033 rows has valid wins or nominations. There are four patterns "n/Nominated for #" "# nomination" "w/Won #" "# win". Therefore, I matched those patterns and extracted out numbers and summed them into wins and nominations.
+**Notice**: There are 13033 rows has valid wins or nominations. There are four patterns "n/Nominated for #" "# nomination" "w/Won #" "# win". Therefore, I matched those patterns and extracted out numbers and summed them into wins and nominations.
 
 ```{r}
-# TODO: Plot Gross revenue against wins and nominations
 attach(mtcars)
 par(mfrow=c(1,2))
 ggplot(subsetmatch, aes(x=wins, y=Gross)) +
@@ -318,9 +293,7 @@ ggplot(subsetmatch, aes(x=nominations, y=Gross)) +
     geom_smooth()            # Add a loess smoothed fit curve with confidence region
 ```
 
-**Q**: How does the gross revenue vary by number of awards won and nominations received?
-
-**A**: The win-gross chart shows that there is no clear linear relationship between the number of wins and gross. The nomination-gross chart shows that there is a linear relationship between the number of nominations and gross before a threshold, then the relationship becomes diverse afterward.
+**Notice**: The win-gross chart shows that there is no clear linear relationship between the number of wins and gross. The nomination-gross chart shows that there is a linear relationship between the number of nominations and gross before a threshold, then the relationship becomes diverse afterward.
 
 ## 7. Movie ratings from IMDb and Rotten Tomatoes
 
@@ -329,7 +302,6 @@ There are several variables that describe ratings, including IMDb ratings (`imdb
 Investigate the pairwise relationships between these different descriptors using graphs.
 
 ```{r}
-# TODO: Illustrate how ratings from IMDb and Rotten Tomatoes are related
 #Here, I focuses on IMDb avearge ratings (imdbRating) and Tomato ratings (tomatoRating)
 summary(subsetmatch$imdbRating)#min 1.1;1st 5.6;median 6.4; mean 6.24; 3rd 7.1; max 9.8
 summary(subsetmatch$tomatoRating)#min 0; 1st 4.8; median 6; mean 5.86; 3rd 7; max 9.8
@@ -340,9 +312,7 @@ ggplot(data=subsetmatch, aes(subsetmatch$tomatoRating))+geom_density()
 
 ```
 
-**Q**: Comment on the similarities and differences between the user ratings of IMDb and the critics ratings of Rotten Tomatoes.
-
-**A**: Similarly, the difference between median and mean of both ratings is small, which indicated that there are no outstanding outliers. Differently, the distribution of IMDb is fat-tail while the distribution of Tomato is long-tail.
+**Notice**: Similarly, the difference between median and mean of both ratings is small, which indicated that there are no outstanding outliers. Differently, the distribution of IMDb is fat-tail while the distribution of Tomato is long-tail.
 
 ## 8. Ratings and awards
 
@@ -351,7 +321,6 @@ These ratings typically reflect the general appeal of the movie to the public or
 Study the relationship between ratings and awards using graphs (awards here refers to wins and/or nominations). 
 
 ```{r}
-# TODO: Show how ratings and awards are related
 attach(mtcars)
 par(mfrow=c(2,2))
 #IMDb rating vs wins
@@ -372,16 +341,10 @@ ggplot(subsetmatch, aes(x=tomatoRating, y=nominations)) +
     geom_smooth()            # Add a loess smoothed fit curve with confidence region
 ```
 
-**Q**: How good are these ratings in terms of predicting the success of a movie in winning awards or nominations? Is there a high correlation between two variables?
+**Notice**: Those ratings are not good for predicting the success of a movie because we could not see a clear linear relationship. But for tomato ratings, there is a rating range, during which higher rating could predict more wins. I tried to compute the correlation, but the results are NAs. The charts did not show a high correlation. 
 
-**A**: Those ratings are not good for predicting the success of a movie because we could not see a clear linear relationship. But for tomato ratings, there is a rating range, during which higher rating could predict more wins. I tried to compute the correlation, but the results are NAs. The charts did not show a high correlation. 
-
-## 9. Expected insights
-
-Come up with two new insights (backed up by data and graphs) that is expected. Here “new” means insights that are not an immediate consequence of one of the above tasks. You may use any of the columns already explored above or a different one in the dataset, such as `Title`, `Actors`, etc.
-
+## 9. More insights
 ```{r}
-# TODO: Find and illustrate two expected insights
 subsetrated <- subset(subsetmatch, subsetmatch$Rated=="R"|subsetmatch$Rated=="N-17")
 #imdbRating ~ Gross
 attach(mtcars)
@@ -395,21 +358,14 @@ ggplot(subsetrated, aes(x=tomatoRating, y=Gross)) +
     geom_smooth()            # Add a loess smoothed fit curve with confidence region
 ```
 
-**Q**: Expected insight #1.
+**Notice**: Restricted movie rating (R and N-17): these movie ratings seriously restrict the audiences and might impact the profitability of the movie. My hypothesis is that the positive linear relationship will be obvious for these movies. The plots also show it.
 
-**A**: Restricted movie rating (R and N-17): these movie ratings seriously restrict the audiences and might impact the profitability of the movie. My hypothesis is that the positive linear relationship will be obvious for these movies. The plots also show it.
-
-**Q**: Expected insight #2.
-
-**A**: My hypothesis is that ratings from IMDB will have different impacts on gross when comparing with the impact of ratings from Tomato. The charts show it. Also, for IMDB rating, the positive linear relationship become obvious after the rating is larger than 7.5, while for tomato rating, the linear relationship is very smooth (slope is small).
+**Notice**: My hypothesis is that ratings from IMDB will have different impacts on gross when comparing with the impact of ratings from Tomato. The charts show it. Also, for IMDB rating, the positive linear relationship become obvious after the rating is larger than 7.5, while for tomato rating, the linear relationship is very smooth (slope is small).
 
 
-## 10. Unexpected insight
-
-Come up with one new insight (backed up by data and graphs) that is unexpected at first glance and do your best to motivate it. Same instructions apply as the previous task.
+## 10. The number of movies that one director directed VS The number of wins that one director receives for the movies
 
 ```{r}
-# TODO: Find and illustrate one unexpected insight
 subsetdirectorsum <- aggregate(wins~Director, subsetmatch, sum)
 names(subsetdirectorsum)[2] <- "sum"
 subsetdirectornum <- aggregate(wins~Director, subsetmatch, length)
@@ -419,7 +375,5 @@ subsetdirector <- as.data.frame(subsetdirector)
 ggplot(subsetdirector, aes(x=num, y=sum)) + geom_point(shape=1) # sum is number of wins; num is number of movies directed by the director
 ```
 
-**Q**: Unexpected insight.
-
-**A**: I am interested in the relationship between the number of movies that one director directed and the number of wins that one director receives for the movies. My hypothesis is that "no pains, no gains", which means that you have more chance to get awards if you produced more movies. But it's not the truth. You can see that some directors created more than 150 movies, but the number of awards is almost 0. Therefore, we must put quality before quantity. If there are more data about the gender of directors, it would be awesome to investigate the gender issue in the film production field.
+**Notice**: I am interested in the relationship between the number of movies that one director directed and the number of wins that one director receives for the movies. My hypothesis is that "no pains, no gains", which means that you have more chance to get awards if you produced more movies. But it's not the truth. You can see that some directors created more than 150 movies, but the number of awards is almost 0. Therefore, we must put quality before quantity. If there are more data about the gender of directors, it would be awesome to investigate the gender issue in the film production field.
 
