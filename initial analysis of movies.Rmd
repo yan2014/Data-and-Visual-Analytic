@@ -1,17 +1,3 @@
----
-title: 'Project 1: Explore and Prepare Data'
-subtitle: |-
-  CSE6242 - Data and Visual Analytics - Spring 2017
-  Due: Sunday, March 5, 2017 at 11:59 PM UTC-12:00 on T-Square
-output:
-  word_document: default
-  html_notebook: default
-  pdf_document: default
-  html_document: default
----
-
-_Note: This project involves getting data ready for analysis and doing some preliminary investigations. Project 2 will involve modeling and predictions, and will be released at a later date. Both projects will have equal weightage towards your grade._
-
 # Data
 
 In this project, you will explore a dataset that contains information about movies, including ratings, budget, gross revenue and other attributes. It was prepared by Dr. Guy Lebanon, and here is his description of the dataset:
@@ -21,27 +7,6 @@ In this project, you will explore a dataset that contains information about movi
 # Objective
 
 Your goal is to investigate the relationship between the movie descriptors and the box office success of movies, as represented by the variable `Gross`. This task is extremely important as it can help a studio decide which titles to fund for production, how much to bid on produced movies, when to release a title, how much to invest in marketing and PR, etc. This information is most useful before a title is released, but it is still very valuable after the movie is already released to the public (for example it can affect additional marketing spend or how much a studio should negotiate with on-demand streaming companies for “second window” streaming rights).
-
-# Instructions
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. Open this file in RStudio to get started.
-
-When you execute code within the notebook, the results appear beneath the code. Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
-
-```{r}
-x = 1:10
-print(x^2)
-```
-
-Plots appear inline too:
-```{r}
-plot(x, x^2, 'o')
-```
-
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
-
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file).
-
-Please complete the tasks below and submit this R Markdown file (as **pr1.Rmd**) as well as a PDF export of it (as **pr1.pdf**). Both should contain all the code, output, plots and written responses for each task.
 
 # Setup
 
