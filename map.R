@@ -48,4 +48,5 @@ final <- fl_base +
   geom_polygon(color = "black", fill = NA) +
   theme_bw() +
   ditch_the_axes
+#data transformation to make the distribution comparable
 final + scale_fill_gradient(trans = "log10")
