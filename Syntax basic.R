@@ -1,6 +1,4 @@
-#GTID: 903295488
 #1.	Get Familiar with R
-print("Hello, ID: 903295488")
 print("Hello, Shiyan Jiang")
 i=0
 print(i+1)
