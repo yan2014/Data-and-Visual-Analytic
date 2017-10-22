@@ -1,0 +1,497 @@
+---
+title: 'Project 2: Modeling and Evaluation'
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+subtitle: '<p>CSE6242 - Data and Visual Analytics</p><p>Due: Friday, April 21, 2017
+  at 11:59 PM UTC-12:00 on T-Square</p>'
+GTID: sjiang98
+---
+
+# Data
+
+We will use the same dataset as Project 1: [`movies_merged`](https://s3.amazonaws.com/content.udacity-data.com/courses/gt-cs6242/project/movies_merged).
+
+# Objective
+
+Your goal in this project is to build a linear regression model that can predict the `Gross` revenue earned by a movie based on other variables. You may use R packages to fit and evaluate a regression model (no need to implement regression yourself). Please stick to linear regression, however.
+
+# Instructions
+
+You should be familiar with using an [RMarkdown](http://rmarkdown.rstudio.com) Notebook by now. Remember that you have to open it in RStudio, and you can run code chunks by pressing *Cmd+Shift+Enter*.
+
+Please complete the tasks below and submit this R Markdown file (as **pr2.Rmd**) containing all completed code chunks and written responses, as well as a PDF export of it (as **pr2.pdf**) which should include all of that plus output, plots and written responses for each task.
+
+_Note that **Setup** and **Data Preprocessing** steps do not carry any points, however, they need to be completed as instructed in order to get meaningful results._
+
+# Setup
+
+Same as Project 1, load the dataset into memory:
+
+```{r}
+load('movies_merged')
+```
+
+This creates an object of the same name (`movies_merged`). For convenience, you can copy it to `df` and start using it:
+
+```{r}
+df = movies_merged
+cat("Dataset has", dim(df)[1], "rows and", dim(df)[2], "columns", end="\n", file="")
+colnames(df)
+```
+
+## Load R packages
+
+Load any R packages that you will need to use. You can come back to this chunk, edit it and re-run to load any additional packages later.
+
+```{r}
+library(ggplot2)
+library(GGally)
+library(NLP)
+library(tm)
+library(stringr)
+library(tidyr)
+library(xlsx)
+library(MASS)
+```
+
+If you are using any non-standard packages (ones that have not been discussed in class or explicitly allowed for this project), please mention them below. Include any special instructions if they cannot be installed using the regular `install.packages('<pkg name>')` command.
+
+**Non-standard packages used**: None
+
+# Data Preprocessing
+
+Before we start building models, we should clean up the dataset and perform any preprocessing steps that may be necessary. Some of these steps can be copied in from your Project 1 solution. It may be helpful to print the dimensions of the resulting dataframe at each step.
+
+## 1. Remove non-movie rows
+
+```{r}
+# TODO: Remove all rows from df that do not correspond to movies
+df=df[df$Type=="movie", ]#40000rows remained
+```
+
+## 2. Drop rows with missing `Gross` value
+
+Since our goal is to model `Gross` revenue against other variables, rows that have missing `Gross` values are not useful to us.
+
+```{r}
+# TODO: Remove rows with missing Gross value
+df=df[!is.na(df$Gross),]
+```
+
+## 3. Exclude movies released prior to 2000
+
+Inflation and other global financial factors may affect the revenue earned by movies during certain periods of time. Taking that into account is out of scope for this project, so let's exclude all movies that were released prior to the year 2000 (you may use `Released`, `Date` or `Year` for this purpose).
+
+```{r}
+# TODO: Exclude movies released prior to 2000
+df<-df[!(df$Year<=2000),] #I used 'Year'
+```
+
+## 4. Eliminate mismatched rows
+
+_Note: You may compare the `Released` column (string representation of release date) with either `Year` or `Date` (numeric representation of the year) to find mismatches. The goal is to avoid removing more than 10% of the rows._
+
+```{r}
+# TODO: Remove mismatched rows
+#avoid removing more than 3163*0.1 rows
+subsetmatch <- subset(df, as.numeric(substr(df$Released,1,4))-as.numeric(df$Year)<=1) # remaining 3050 rows
+#3163-3050=113 rows were deleted
+```
+
+## 5. Drop `Domestic_Gross` column
+
+`Domestic_Gross` is basically the amount of revenue a movie earned within the US. Understandably, it is very highly correlated with `Gross` and is in fact equal to it for movies that were not released globally. Hence, it should be removed for modeling purposes.
+
+```{r}
+# TODO: Exclude the `Domestic_Gross` column
+subsetmatch <- subset(subsetmatch, select = -Domestic_Gross)
+```
+
+## 6. Process `Runtime` column
+
+```{r}
+# TODO: Replace df$Runtime with a numeric column containing the runtime in minutes
+df <- subsetmatch
+df$Runtime[df$Runtime=="1 h"] <- "60 min"#change runtime 1 h to be 60 min
+df=df[df$Runtime!="N/A",]#remove columns without runtime, 3050-3026=24 rows removed
+df$newtime <- str_extract_all(df$Runtime,"\\(?[0-9,.]+\\)?",simplify = TRUE)#extract runtime as seperate numbers, and there is only mins in the column
+df$Runtime <- df$newtime#replace runtime with newtime
+df <- subset(df, select = -newtime) #delete column newtime 
+```
+
+Perform any additional preprocessing steps that you find necessary, such as dealing with missing values or highly correlated columns (feel free to add more code chunks, markdown blocks and plots here as necessary).
+
+```{r}
+# TODO(optional): Additional preprocessing
+#since tomatoreviews=tomatofresh+tomatorotten, I will delete the tomatoRotten column
+df <- subset(df, select = -tomatoRotten)
+#since year and date have the same data, I will delete the Date column
+df <- subset(df, select = -Date)
+
+```
+
+_**Note**: Do NOT convert categorical variables (like `Genre`) into binary columns yet. You will do that later as part of a model improvement task._
+
+## Final preprocessed dataset
+
+Report the dimensions of the preprocessed dataset you will be using for modeling and evaluation, and print all the final column names. (Again, `Domestic_Gross` should not be in this list!)
+
+```{r}
+# TODO: Print the dimensions of the final preprocessed dataset and column names
+cat("Dataset has", dim(df)[1], "rows and", dim(df)[2], "columns", end="\n", file="")
+colnames(df)
+```
+
+# Evaluation Strategy
+
+In each of the tasks described in the next section, you will build a regression model. In order to compare their performance, use the following evaluation procedure every time:
+
+1. Randomly divide the rows into two sets of sizes 5% and 95%.
+2. Use the first set for training and the second for testing.
+3. Compute the Root Mean Squared Error (RMSE) on the train and test sets.
+4. Repeat the above data partition and model training and evaluation 10 times and average the RMSE results so the results stabilize.
+5. Repeat the above steps for different proportions of train and test sizes: 10%-90%, 15%-85%, ..., 95%-5% (total 19 splits including the initial 5%-95%).
+6. Generate a graph of the averaged train and test RMSE as a function of the train set size (%).
+
+You can define a helper function that applies this procedure to a given model and reuse it.
+
+# Tasks
+
+Each of the following tasks is worth 20 points. Remember to build each model as specified, evaluate it using the strategy outlined above, and plot the training and test errors by training set size (%).
+
+## 1. Numeric variables
+
+Use linear regression to predict `Gross` based on all available _numeric_ variables.
+
+```{r}
+# TODO: Build & evaluate model 1 (numeric variables only)
+df$Runtime <- as.numeric(df$Runtime)
+df$Metascore <- as.numeric(df$Metascore)
+df$index<-1:nrow(df)
+df$index <- as.numeric(df$index)
+nums <- sapply(df, is.numeric)
+df_numeric  <- df[ , nums] #df_numeric keep only numeric variables
+df_numeric <- na.omit(df_numeric) #deleted rows with NA, remains 2614 rows
+df_numeric <- merge(df_numeric, df, by="index")
+colnames(df_numeric)[colnames(df_numeric)=="Year.x"] <- "Year"
+colnames(df_numeric)[colnames(df_numeric)=="Runtime.x"] <- "Runtime"
+colnames(df_numeric)[colnames(df_numeric)=="Metascore.x"] <- "Metascore"
+colnames(df_numeric)[colnames(df_numeric)=="imdbRating.x"] <- "imdbRating"
+colnames(df_numeric)[colnames(df_numeric)=="imdbVotes.x"] <- "imdbVotes"
+colnames(df_numeric)[colnames(df_numeric)=="tomatoMeter.x"] <- "tomatoMeter"
+colnames(df_numeric)[colnames(df_numeric)=="tomatoRating.x"] <- "tomatoRating"
+colnames(df_numeric)[colnames(df_numeric)=="tomatoReviews.x"] <- "tomatoReviews"
+colnames(df_numeric)[colnames(df_numeric)=="tomatoFresh.x"] <- "tomatoFresh"
+colnames(df_numeric)[colnames(df_numeric)=="tomatoUserMeter.x"] <- "tomatoUserMeter"
+colnames(df_numeric)[colnames(df_numeric)=="tomatoUserRating.x"] <- "tomatoUserRating"
+colnames(df_numeric)[colnames(df_numeric)=="tomatoUserReviews.x"] <- "tomatoUserReviews"
+colnames(df_numeric)[colnames(df_numeric)=="Budget.x"] <- "Budget"
+colnames(df_numeric)[colnames(df_numeric)=="Gross.x"] <- "Gross"
+df_numeric <- subset(df_numeric, select = -Year.y)
+df_numeric <- subset(df_numeric, select = -Runtime.y)
+df_numeric <- subset(df_numeric, select = -Metascore.y)
+df_numeric <- subset(df_numeric, select = -imdbRating.y)
+df_numeric <- subset(df_numeric, select = -imdbVotes.y)
+df_numeric <- subset(df_numeric, select = -tomatoMeter.y)
+df_numeric <- subset(df_numeric, select = -tomatoRating.y)
+df_numeric <- subset(df_numeric, select = -tomatoReviews.y)
+df_numeric <- subset(df_numeric, select = -tomatoFresh.y)
+df_numeric <- subset(df_numeric, select = -tomatoUserMeter.y)
+df_numeric <- subset(df_numeric, select = -tomatoUserRating.y)
+df_numeric <- subset(df_numeric, select = -tomatoUserReviews.y)
+df_numeric <- subset(df_numeric, select = -Budget.y)
+df_numeric <- subset(df_numeric, select = -Gross.y)
+#colnames(df_numeric)
+getaverageRMSE <- function(percen){
+  averagesampletrain=c()
+  averagesampletest=c()
+  for(i in 1:10){
+  smp_size <- floor(percen * nrow(df_numeric))
+  set.seed(123)
+  #split data into train and test data
+  spl <- sample(1:nrow(df_numeric), size = smp_size)
+  sampledatatrain <- df_numeric[spl, ]
+  sampledatatest <- df_numeric[-spl, ]
+  #building linear regression model based on train data
+  M1=lm(Gross~Year+Runtime+Metascore+imdbRating+imdbVotes+tomatoMeter+tomatoRating+tomatoReviews+tomatoFresh+tomatoUserMeter+tomatoUserRating+tomatoUserReviews+Budget,sampledatatrain)
+  #obtain test set predictions from M1
+  preTest=predict(M1, sampledatatest)
+  preTest=as.data.frame(preTest)
+  RSME_test=sqrt(mean((sampledatatest$Gross-preTest)^2))
+  averagesampletrain=c(averagesampletrain,sqrt(residuals(M1)^2))
+  averagesampletest=c(averagesampletest,RSME_test)
+  }
+  final=c()
+  final=c(final,mean(averagesampletrain))
+  final=c(final,mean(averagesampletest))
+  return (final)
+}
+size <- c(0.05, 0.1, 0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95)
+trainRSME=c(getaverageRMSE(0.05)[1],getaverageRMSE(0.1)[1],getaverageRMSE(0.15)[1],getaverageRMSE(0.2)[1],getaverageRMSE(0.25)[1],getaverageRMSE(0.3)[1],getaverageRMSE(0.35)[1],getaverageRMSE(0.4)[1],getaverageRMSE(0.45)[1],getaverageRMSE(0.5)[1],getaverageRMSE(0.55)[1],getaverageRMSE(0.6)[1],getaverageRMSE(0.65)[1],getaverageRMSE(0.7)[1],getaverageRMSE(0.75)[1],getaverageRMSE(0.8)[1],getaverageRMSE(0.85)[1],getaverageRMSE(0.9)[1],getaverageRMSE(0.95)[1])
+testRSME=c(getaverageRMSE(0.05)[2],getaverageRMSE(0.1)[2],getaverageRMSE(0.15)[2],getaverageRMSE(0.2)[2],getaverageRMSE(0.25)[2],getaverageRMSE(0.3)[2],getaverageRMSE(0.35)[2],getaverageRMSE(0.4)[2],getaverageRMSE(0.45)[2],getaverageRMSE(0.5)[2],getaverageRMSE(0.55)[2],getaverageRMSE(0.6)[2],getaverageRMSE(0.65)[2],getaverageRMSE(0.7)[2],getaverageRMSE(0.75)[2],getaverageRMSE(0.8)[2],getaverageRMSE(0.85)[2],getaverageRMSE(0.9)[2],getaverageRMSE(0.95)[2])
+dataformodel1<- data.frame(size, trainRSME,testRSME)
+#Generate a graph of the averaged train and test RMSE as a function of the train set size (%)
+ggplot(dataformodel1, aes(size)) + 
+  geom_line(aes(y = trainRSME, color="train")) + 
+  geom_line(aes(y = testRSME, color="test"))
+```
+
+**Q**: List all the numeric variables you used.
+
+**A**: I used the following numeric variables: Year+Runtime+Metascore+imdbRating+imdbVotes+tomatoMeter+tomatoRating+tomatoReviews+tomatoFresh+tomatoUserMeter+tomatoUserRating+tomatoUserReviews+Budget
+
+## 2. Feature transformations
+
+Try to improve the prediction quality from **Task 1** as much as possible by adding feature transformations of the numeric variables. Explore both numeric transformations such as power transforms and non-numeric transformations of the numeric variables like binning (e.g. `is_budget_greater_than_3M`).
+
+```{r}
+# TODO: Build & evaluate model 2 (transformed numeric variables only)
+#Budget
+ggplot(df_numeric, aes(x=Budget^1.4, y=Gross)) +
+    geom_point(shape=1) +    
+    geom_smooth()
+df_numeric$Budget <- df_numeric$Budget^1.4
+trainRSME=c(getaverageRMSE(0.05)[1],getaverageRMSE(0.1)[1],getaverageRMSE(0.15)[1],getaverageRMSE(0.2)[1],getaverageRMSE(0.25)[1],getaverageRMSE(0.3)[1],getaverageRMSE(0.35)[1],getaverageRMSE(0.4)[1],getaverageRMSE(0.45)[1],getaverageRMSE(0.5)[1],getaverageRMSE(0.55)[1],getaverageRMSE(0.6)[1],getaverageRMSE(0.65)[1],getaverageRMSE(0.7)[1],getaverageRMSE(0.75)[1],getaverageRMSE(0.8)[1],getaverageRMSE(0.85)[1],getaverageRMSE(0.9)[1],getaverageRMSE(0.95)[1])
+testRSME=c(getaverageRMSE(0.05)[2],getaverageRMSE(0.1)[2],getaverageRMSE(0.15)[2],getaverageRMSE(0.2)[2],getaverageRMSE(0.25)[2],getaverageRMSE(0.3)[2],getaverageRMSE(0.35)[2],getaverageRMSE(0.4)[2],getaverageRMSE(0.45)[2],getaverageRMSE(0.5)[2],getaverageRMSE(0.55)[2],getaverageRMSE(0.6)[2],getaverageRMSE(0.65)[2],getaverageRMSE(0.7)[2],getaverageRMSE(0.75)[2],getaverageRMSE(0.8)[2],getaverageRMSE(0.85)[2],getaverageRMSE(0.9)[2],getaverageRMSE(0.95)[2])
+dataformodel2_1<- data.frame(size, trainRSME,testRSME)
+#imdbVotes
+ggplot(df_numeric, aes(x=imdbVotes^0.8, y=Gross)) +
+    geom_point(shape=1) +    
+    geom_smooth()
+df_numeric$imdbVotes <- df_numeric$imdbVotes^0.8
+trainRSME=c(getaverageRMSE(0.05)[1],getaverageRMSE(0.1)[1],getaverageRMSE(0.15)[1],getaverageRMSE(0.2)[1],getaverageRMSE(0.25)[1],getaverageRMSE(0.3)[1],getaverageRMSE(0.35)[1],getaverageRMSE(0.4)[1],getaverageRMSE(0.45)[1],getaverageRMSE(0.5)[1],getaverageRMSE(0.55)[1],getaverageRMSE(0.6)[1],getaverageRMSE(0.65)[1],getaverageRMSE(0.7)[1],getaverageRMSE(0.75)[1],getaverageRMSE(0.8)[1],getaverageRMSE(0.85)[1],getaverageRMSE(0.9)[1],getaverageRMSE(0.95)[1])
+testRSME=c(getaverageRMSE(0.05)[2],getaverageRMSE(0.1)[2],getaverageRMSE(0.15)[2],getaverageRMSE(0.2)[2],getaverageRMSE(0.25)[2],getaverageRMSE(0.3)[2],getaverageRMSE(0.35)[2],getaverageRMSE(0.4)[2],getaverageRMSE(0.45)[2],getaverageRMSE(0.5)[2],getaverageRMSE(0.55)[2],getaverageRMSE(0.6)[2],getaverageRMSE(0.65)[2],getaverageRMSE(0.7)[2],getaverageRMSE(0.75)[2],getaverageRMSE(0.8)[2],getaverageRMSE(0.85)[2],getaverageRMSE(0.9)[2],getaverageRMSE(0.95)[2])
+dataformodel2_2<- data.frame(size, trainRSME,testRSME)
+#Runtime
+ggplot(df_numeric, aes(x=Runtime, y=Gross)) +
+    geom_point(shape=1) +    
+    geom_smooth()
+summary(df_numeric$Runtime)
+df_numeric$Runtime<-cut(df_numeric$Runtime, seq(58,220,27), right=FALSE, labels=c(1:6))
+trainRSME=c(getaverageRMSE(0.05)[1],getaverageRMSE(0.1)[1],getaverageRMSE(0.15)[1],getaverageRMSE(0.2)[1],getaverageRMSE(0.25)[1],getaverageRMSE(0.3)[1],getaverageRMSE(0.35)[1],getaverageRMSE(0.4)[1],getaverageRMSE(0.45)[1],getaverageRMSE(0.5)[1],getaverageRMSE(0.55)[1],getaverageRMSE(0.6)[1],getaverageRMSE(0.65)[1],getaverageRMSE(0.7)[1],getaverageRMSE(0.75)[1],getaverageRMSE(0.8)[1],getaverageRMSE(0.85)[1],getaverageRMSE(0.9)[1],getaverageRMSE(0.95)[1])
+testRSME=c(getaverageRMSE(0.05)[2],getaverageRMSE(0.1)[2],getaverageRMSE(0.15)[2],getaverageRMSE(0.2)[2],getaverageRMSE(0.25)[2],getaverageRMSE(0.3)[2],getaverageRMSE(0.35)[2],getaverageRMSE(0.4)[2],getaverageRMSE(0.45)[2],getaverageRMSE(0.5)[2],getaverageRMSE(0.55)[2],getaverageRMSE(0.6)[2],getaverageRMSE(0.65)[2],getaverageRMSE(0.7)[2],getaverageRMSE(0.75)[2],getaverageRMSE(0.8)[2],getaverageRMSE(0.85)[2],getaverageRMSE(0.9)[2],getaverageRMSE(0.95)[2])
+dataformodel2_3<- data.frame(size, trainRSME,testRSME)
+#Metascore, no help in reducing RMSE while bining Metacore.
+#imdbRating
+ggplot(df_numeric, aes(x=imdbRating, y=Gross)) +
+    geom_point(shape=1) +    
+    geom_smooth()
+summary(df_numeric$imdbRating)
+df_numeric$imdbRatingoriginal <- df_numeric$imdbRating
+df_numeric$imdbRating<-cut(df_numeric$imdbRating, seq(1.5,9.3,1.3), right=FALSE, labels=c(1:6))
+trainRSME=c(getaverageRMSE(0.05)[1],getaverageRMSE(0.1)[1],getaverageRMSE(0.15)[1],getaverageRMSE(0.2)[1],getaverageRMSE(0.25)[1],getaverageRMSE(0.3)[1],getaverageRMSE(0.35)[1],getaverageRMSE(0.4)[1],getaverageRMSE(0.45)[1],getaverageRMSE(0.5)[1],getaverageRMSE(0.55)[1],getaverageRMSE(0.6)[1],getaverageRMSE(0.65)[1],getaverageRMSE(0.7)[1],getaverageRMSE(0.75)[1],getaverageRMSE(0.8)[1],getaverageRMSE(0.85)[1],getaverageRMSE(0.9)[1],getaverageRMSE(0.95)[1])
+testRSME=c(getaverageRMSE(0.05)[2],getaverageRMSE(0.1)[2],getaverageRMSE(0.15)[2],getaverageRMSE(0.2)[2],getaverageRMSE(0.25)[2],getaverageRMSE(0.3)[2],getaverageRMSE(0.35)[2],getaverageRMSE(0.4)[2],getaverageRMSE(0.45)[2],getaverageRMSE(0.5)[2],getaverageRMSE(0.55)[2],getaverageRMSE(0.6)[2],getaverageRMSE(0.65)[2],getaverageRMSE(0.7)[2],getaverageRMSE(0.75)[2],getaverageRMSE(0.8)[2],getaverageRMSE(0.85)[2],getaverageRMSE(0.9)[2],getaverageRMSE(0.95)[2])
+dataformodel2_4<- data.frame(size, trainRSME,testRSME)
+df_numeric <- subset(df_numeric, select = -imdbRatingoriginal)
+#tomatoMeter, no help in reducing RMSE while bining tomatoMeter.
+#tomatoRating, no help in reducing RMSE while bining tomatoRating.
+#tomatoReviews
+ggplot(df_numeric, aes(x=tomatoReviews, y=Gross)) +
+    geom_point(shape=1) +    
+    geom_smooth()
+summary(df_numeric$tomatoReviews)
+df_numeric$tomatoReviewsoriginal <- df_numeric$tomatoReviews
+df_numeric$tomatoReviews<-cut(df_numeric$tomatoReviews, seq(5.0,356.0,58.5), right=FALSE, labels=c(1:6))
+trainRSME=c(getaverageRMSE(0.05)[1],getaverageRMSE(0.1)[1],getaverageRMSE(0.15)[1],getaverageRMSE(0.2)[1],getaverageRMSE(0.25)[1],getaverageRMSE(0.3)[1],getaverageRMSE(0.35)[1],getaverageRMSE(0.4)[1],getaverageRMSE(0.45)[1],getaverageRMSE(0.5)[1],getaverageRMSE(0.55)[1],getaverageRMSE(0.6)[1],getaverageRMSE(0.65)[1],getaverageRMSE(0.7)[1],getaverageRMSE(0.75)[1],getaverageRMSE(0.8)[1],getaverageRMSE(0.85)[1],getaverageRMSE(0.9)[1],getaverageRMSE(0.95)[1])
+testRSME=c(getaverageRMSE(0.05)[2],getaverageRMSE(0.1)[2],getaverageRMSE(0.15)[2],getaverageRMSE(0.2)[2],getaverageRMSE(0.25)[2],getaverageRMSE(0.3)[2],getaverageRMSE(0.35)[2],getaverageRMSE(0.4)[2],getaverageRMSE(0.45)[2],getaverageRMSE(0.5)[2],getaverageRMSE(0.55)[2],getaverageRMSE(0.6)[2],getaverageRMSE(0.65)[2],getaverageRMSE(0.7)[2],getaverageRMSE(0.75)[2],getaverageRMSE(0.8)[2],getaverageRMSE(0.85)[2],getaverageRMSE(0.9)[2],getaverageRMSE(0.95)[2])
+dataformodel2_5<- data.frame(size, trainRSME,testRSME)
+df_numeric <- subset(df_numeric, select = -tomatoReviewsoriginal)
+#tomatoFresh
+ggplot(df_numeric, aes(x=tomatoFresh, y=Gross)) +
+    geom_point(shape=1) +    
+    geom_smooth()
+summary(df_numeric$tomatoFresh)
+df_numeric$tomatoFreshoriginal <- df_numeric$tomatoFresh
+df_numeric$tomatoFresh <- df_numeric$tomatoFreshoriginal
+df_numeric$tomatoFresh<-cut(df_numeric$tomatoFresh, seq(0,345.0,115), right=FALSE, labels=c(1:3))
+trainRSME=c(getaverageRMSE(0.05)[1],getaverageRMSE(0.1)[1],getaverageRMSE(0.15)[1],getaverageRMSE(0.2)[1],getaverageRMSE(0.25)[1],getaverageRMSE(0.3)[1],getaverageRMSE(0.35)[1],getaverageRMSE(0.4)[1],getaverageRMSE(0.45)[1],getaverageRMSE(0.5)[1],getaverageRMSE(0.55)[1],getaverageRMSE(0.6)[1],getaverageRMSE(0.65)[1],getaverageRMSE(0.7)[1],getaverageRMSE(0.75)[1],getaverageRMSE(0.8)[1],getaverageRMSE(0.85)[1],getaverageRMSE(0.9)[1],getaverageRMSE(0.95)[1])
+testRSME=c(getaverageRMSE(0.05)[2],getaverageRMSE(0.1)[2],getaverageRMSE(0.15)[2],getaverageRMSE(0.2)[2],getaverageRMSE(0.25)[2],getaverageRMSE(0.3)[2],getaverageRMSE(0.35)[2],getaverageRMSE(0.4)[2],getaverageRMSE(0.45)[2],getaverageRMSE(0.5)[2],getaverageRMSE(0.55)[2],getaverageRMSE(0.6)[2],getaverageRMSE(0.65)[2],getaverageRMSE(0.7)[2],getaverageRMSE(0.75)[2],getaverageRMSE(0.8)[2],getaverageRMSE(0.85)[2],getaverageRMSE(0.9)[2],getaverageRMSE(0.95)[2])
+dataformodel2_6<- data.frame(size, trainRSME,testRSME)
+df_numeric <- subset(df_numeric, select = -tomatoFreshoriginal)
+#tomatoUserMeter, no help in reducing RMSE while bining tomatoUserMeter.
+#tomatoUserRating
+ggplot(df_numeric, aes(x=tomatoUserRating, y=Gross)) +
+    geom_point(shape=1) +    
+    geom_smooth()
+summary(df_numeric$tomatoUserRating)
+df_numeric$tomatoUserRatingoriginal <- df_numeric$tomatoUserRating
+df_numeric$tomatoUserRating <- df_numeric$tomatoUserRatingoriginal
+df_numeric$tomatoUserRating<-cut(df_numeric$tomatoUserRating, seq(1.5,4.8,0.825), right=FALSE, labels=c(1:4))
+trainRSME=c(getaverageRMSE(0.05)[1],getaverageRMSE(0.1)[1],getaverageRMSE(0.15)[1],getaverageRMSE(0.2)[1],getaverageRMSE(0.25)[1],getaverageRMSE(0.3)[1],getaverageRMSE(0.35)[1],getaverageRMSE(0.4)[1],getaverageRMSE(0.45)[1],getaverageRMSE(0.5)[1],getaverageRMSE(0.55)[1],getaverageRMSE(0.6)[1],getaverageRMSE(0.65)[1],getaverageRMSE(0.7)[1],getaverageRMSE(0.75)[1],getaverageRMSE(0.8)[1],getaverageRMSE(0.85)[1],getaverageRMSE(0.9)[1],getaverageRMSE(0.95)[1])
+testRSME=c(getaverageRMSE(0.05)[2],getaverageRMSE(0.1)[2],getaverageRMSE(0.15)[2],getaverageRMSE(0.2)[2],getaverageRMSE(0.25)[2],getaverageRMSE(0.3)[2],getaverageRMSE(0.35)[2],getaverageRMSE(0.4)[2],getaverageRMSE(0.45)[2],getaverageRMSE(0.5)[2],getaverageRMSE(0.55)[2],getaverageRMSE(0.6)[2],getaverageRMSE(0.65)[2],getaverageRMSE(0.7)[2],getaverageRMSE(0.75)[2],getaverageRMSE(0.8)[2],getaverageRMSE(0.85)[2],getaverageRMSE(0.9)[2],getaverageRMSE(0.95)[2])
+dataformodel2_7<- data.frame(size, trainRSME,testRSME)
+df_numeric <- subset(df_numeric, select = -tomatoUserRatingoriginal)
+#tomatoUserReviews, no help in reducing RMSE while bining tomatoUserReviews.
+
+#Generate a graph of the averaged train and test RMSE as a function of the train set size (%)
+ggplot(dataformodel2_7, aes(size)) + 
+  geom_line(aes(y = trainRSME, color="train")) + 
+  geom_line(aes(y = testRSME, color="test"))
+```
+
+**Q**: Explain which transformations you used and why you chose them.
+
+**A**: 
+As shown from scatter plots, I decided to do power transformation for Budget and imdbVotes, and do bining for other variables.
+1. Budget was transformed into Budget^1.4.After changing the variables bit by bit (0.5,1.5,2) and checking on the RMSEs, 1.5 works best, therefore I changed it to 1.4 and 1.6 and checked the RMSEs. Eventually, I decided to use 1.4. This process was carried out with imdbVotes and it was transformed into imdbVotes^0.8.
+2. I tried bining for the rest varibales and checked the RMSEs, eventually, I decided to bin tomatoUserRating, tomatoFresh, tomatoReviews, imdbRating, and Runtime.
+Overall, when the training data is 0.95,RSME in test data jumped from 77770187 to 69955011.
+
+## 3. Non-numeric variables
+
+Write code that converts genre, actors, directors, and other categorical variables to columns that can be used for regression (e.g. binary columns as you did in Project 1). Also process variables such as awards into more useful columns (again, like you did in Project 1). Now use these converted columns only to build your next model.
+
+```{r}
+# TODO: Build & evaluate model 3 (converted non-numeric variables only)
+#whether it's an comedy movive or not
+pattern <- "Comedy|comedy"
+df_numeric$comedy <- grepl(pattern, df_numeric$Genre)
+df_numeric$comedy <- 1*df_numeric$comedy
+#number of nominations 
+nominations=sapply(df_numeric$Awards, function(x) regmatches(x,gregexpr("(ominated\\sfor\\s[0-9]+)|([0-9]+\\snomination)",x))[[1]])
+nominations=sapply(nominations, function(x) sum(as.numeric(unlist(regmatches(x,gregexpr("[0-9]+",x))))))
+df_numeric$nominations=nominations
+getaverageRMSE <- function(percen){
+  averagesampletrain=c()
+  averagesampletest=c()
+  for(i in 1:10){
+  smp_size <- floor(percen * nrow(df_numeric))
+  set.seed(123)
+  #split data into train and test data
+  spl <- sample(1:nrow(df_numeric), size = smp_size)
+  sampledatatrain <- df_numeric[spl, ]
+  sampledatatest <- df_numeric[-spl, ]
+  #building linear regression model based on train data
+  M1=lm(Gross~comedy+nominations,sampledatatrain)
+  #obtain test set predictions from M1
+  preTest=predict(M1, sampledatatest)
+  preTest=as.data.frame(preTest)
+  RSME_test=sqrt(mean((sampledatatest$Gross-preTest)^2))
+  averagesampletrain=c(averagesampletrain,sqrt(residuals(M1)^2))
+  averagesampletest=c(averagesampletest,RSME_test)
+  }
+  final=c()
+  final=c(final,mean(averagesampletrain))
+  final=c(final,mean(averagesampletest))
+  return (final)
+}
+trainRSME=c(getaverageRMSE(0.05)[1],getaverageRMSE(0.1)[1],getaverageRMSE(0.15)[1],getaverageRMSE(0.2)[1],getaverageRMSE(0.25)[1],getaverageRMSE(0.3)[1],getaverageRMSE(0.35)[1],getaverageRMSE(0.4)[1],getaverageRMSE(0.45)[1],getaverageRMSE(0.5)[1],getaverageRMSE(0.55)[1],getaverageRMSE(0.6)[1],getaverageRMSE(0.65)[1],getaverageRMSE(0.7)[1],getaverageRMSE(0.75)[1],getaverageRMSE(0.8)[1],getaverageRMSE(0.85)[1],getaverageRMSE(0.9)[1],getaverageRMSE(0.95)[1])
+testRSME=c(getaverageRMSE(0.05)[2],getaverageRMSE(0.1)[2],getaverageRMSE(0.15)[2],getaverageRMSE(0.2)[2],getaverageRMSE(0.25)[2],getaverageRMSE(0.3)[2],getaverageRMSE(0.35)[2],getaverageRMSE(0.4)[2],getaverageRMSE(0.45)[2],getaverageRMSE(0.5)[2],getaverageRMSE(0.55)[2],getaverageRMSE(0.6)[2],getaverageRMSE(0.65)[2],getaverageRMSE(0.7)[2],getaverageRMSE(0.75)[2],getaverageRMSE(0.8)[2],getaverageRMSE(0.85)[2],getaverageRMSE(0.9)[2],getaverageRMSE(0.95)[2])
+dataformodel3_1<- data.frame(size, trainRSME,testRSME)
+#Generate a graph of the averaged train and test RMSE as a function of the train set size (%)
+ggplot(dataformodel3_1, aes(size)) + 
+  geom_line(aes(y = trainRSME, color="train")) + 
+  geom_line(aes(y = testRSME, color="test"))
+```
+
+**Q**: Explain which categorical variables you used, and how you encoded them into features.
+
+**A**: I used two categorical variables: whether the movie is comedy or not, and how many nominations the movie got. I searched online and got the sense that comedy movies have more gross. Thus, I encoded comedy movies into 1 and others to be 0. I used number of nominations, instead of number of awards because it captures more of the audiences' taste. 
+
+## 4. Numeric and categorical variables
+
+Try to improve the prediction quality as much as possible by using both numeric and non-numeric variables from **Tasks 2 & 3**.
+
+```{r}
+# TODO: Build & evaluate model 4 (numeric & converted non-numeric variables)
+#combine 2 and 3
+getaverageRMSE <- function(percen){
+  averagesampletrain=c()
+  averagesampletest=c()
+  for(i in 1:10){
+  smp_size <- floor(percen * nrow(df_numeric))
+  set.seed(123)
+  #split data into train and test data
+  spl <- sample(1:nrow(df_numeric), size = smp_size)
+  sampledatatrain <- df_numeric[spl, ]
+  sampledatatest <- df_numeric[-spl, ]
+  #building linear regression model based on train data
+  M1=lm(Gross~Year+Runtime+Metascore+imdbRating+imdbVotes+tomatoMeter+tomatoRating+tomatoReviews+tomatoFresh+tomatoUserMeter+tomatoUserRating+tomatoUserReviews+Budget+comedy+nominations,sampledatatrain)
+  #obtain test set predictions from M1
+  preTest=predict(M1, sampledatatest)
+  preTest=as.data.frame(preTest)
+  RSME_test=sqrt(mean((sampledatatest$Gross-preTest)^2))
+  averagesampletrain=c(averagesampletrain,sqrt(residuals(M1)^2))
+  averagesampletest=c(averagesampletest,RSME_test)
+  }
+  final=c()
+  final=c(final,mean(averagesampletrain))
+  final=c(final,mean(averagesampletest))
+  return (final)
+}
+trainRSME=c(getaverageRMSE(0.05)[1],getaverageRMSE(0.1)[1],getaverageRMSE(0.15)[1],getaverageRMSE(0.2)[1],getaverageRMSE(0.25)[1],getaverageRMSE(0.3)[1],getaverageRMSE(0.35)[1],getaverageRMSE(0.4)[1],getaverageRMSE(0.45)[1],getaverageRMSE(0.5)[1],getaverageRMSE(0.55)[1],getaverageRMSE(0.6)[1],getaverageRMSE(0.65)[1],getaverageRMSE(0.7)[1],getaverageRMSE(0.75)[1],getaverageRMSE(0.8)[1],getaverageRMSE(0.85)[1],getaverageRMSE(0.9)[1],getaverageRMSE(0.95)[1])
+testRSME=c(getaverageRMSE(0.05)[2],getaverageRMSE(0.1)[2],getaverageRMSE(0.15)[2],getaverageRMSE(0.2)[2],getaverageRMSE(0.25)[2],getaverageRMSE(0.3)[2],getaverageRMSE(0.35)[2],getaverageRMSE(0.4)[2],getaverageRMSE(0.45)[2],getaverageRMSE(0.5)[2],getaverageRMSE(0.55)[2],getaverageRMSE(0.6)[2],getaverageRMSE(0.65)[2],getaverageRMSE(0.7)[2],getaverageRMSE(0.75)[2],getaverageRMSE(0.8)[2],getaverageRMSE(0.85)[2],getaverageRMSE(0.9)[2],getaverageRMSE(0.95)[2])
+dataformodel4_1<- data.frame(size, trainRSME,testRSME)
+#Generate a graph of the averaged train and test RMSE as a function of the train set size (%)
+ggplot(dataformodel4_1, aes(size)) + 
+  geom_line(aes(y = trainRSME, color="train")) + 
+  geom_line(aes(y = testRSME, color="test"))
+```
+
+## 5. Additional features
+
+Now try creating additional features such as interactions (e.g. `is_genre_comedy` x `is_budget_greater_than_3M`) or deeper analysis of complex variables (e.g. text analysis of full-text columns like `Plot`).
+
+```{r}
+# TODO: Build & evaluate model 5 (numeric, non-numeric and additional features)
+summary(df_numeric$Budget)
+df_numeric$bugetgreaterthan3 = ifelse(df_numeric$Budget > (3000000^1.4), 1, 0)
+df_numeric$interaction = df_numeric$bugetgreaterthan3* df_numeric$comedy
+getaverageRMSE <- function(percen){
+  averagesampletrain=c()
+  averagesampletest=c()
+  for(i in 1:10){
+  smp_size <- floor(percen * nrow(df_numeric))
+  set.seed(123)
+  #split data into train and test data
+  spl <- sample(1:nrow(df_numeric), size = smp_size)
+  sampledatatrain <- df_numeric[spl, ]
+  sampledatatest <- df_numeric[-spl, ]
+  #building linear regression model based on train data
+  M1=lm(Gross~Year+Runtime+Metascore+imdbRating+imdbVotes+tomatoMeter+tomatoRating+tomatoReviews+tomatoFresh+tomatoUserMeter+tomatoUserRating+tomatoUserReviews+Budget+comedy+nominations+interaction,sampledatatrain)
+  #obtain test set predictions from M1
+  preTest=predict(M1, sampledatatest)
+  preTest=as.data.frame(preTest)
+  RSME_test=sqrt(mean((sampledatatest$Gross-preTest)^2))
+  averagesampletrain=c(averagesampletrain,sqrt(residuals(M1)^2))
+  averagesampletest=c(averagesampletest,RSME_test)
+  }
+  final=c()
+  final=c(final,mean(averagesampletrain))
+  final=c(final,mean(averagesampletest))
+  return (final)
+}
+trainRSME=c(getaverageRMSE(0.05)[1],getaverageRMSE(0.1)[1],getaverageRMSE(0.15)[1],getaverageRMSE(0.2)[1],getaverageRMSE(0.25)[1],getaverageRMSE(0.3)[1],getaverageRMSE(0.35)[1],getaverageRMSE(0.4)[1],getaverageRMSE(0.45)[1],getaverageRMSE(0.5)[1],getaverageRMSE(0.55)[1],getaverageRMSE(0.6)[1],getaverageRMSE(0.65)[1],getaverageRMSE(0.7)[1],getaverageRMSE(0.75)[1],getaverageRMSE(0.8)[1],getaverageRMSE(0.85)[1],getaverageRMSE(0.9)[1],getaverageRMSE(0.95)[1])
+testRSME=c(getaverageRMSE(0.05)[2],getaverageRMSE(0.1)[2],getaverageRMSE(0.15)[2],getaverageRMSE(0.2)[2],getaverageRMSE(0.25)[2],getaverageRMSE(0.3)[2],getaverageRMSE(0.35)[2],getaverageRMSE(0.4)[2],getaverageRMSE(0.45)[2],getaverageRMSE(0.5)[2],getaverageRMSE(0.55)[2],getaverageRMSE(0.6)[2],getaverageRMSE(0.65)[2],getaverageRMSE(0.7)[2],getaverageRMSE(0.75)[2],getaverageRMSE(0.8)[2],getaverageRMSE(0.85)[2],getaverageRMSE(0.9)[2],getaverageRMSE(0.95)[2])
+dataformodel5_1<- data.frame(size, trainRSME,testRSME)
+#Generate a graph of the averaged train and test RMSE as a function of the train set size (%)
+ggplot(dataformodel5_1, aes(size)) + 
+  geom_line(aes(y = trainRSME, color="train")) + 
+  geom_line(aes(y = testRSME, color="test"))
+#generate a graph of all final models
+dataformodel <- merge(dataformodel1, dataformodel2_7,by="size")
+dataformodel <- merge(dataformodel, dataformodel3_1,by="size")
+dataformodel <- merge(dataformodel, dataformodel4_1, by="size")
+dataformodel <- merge(dataformodel, dataformodel5_1, by="size")
+colnames(dataformodel) <- c("size", "model1_train","model1_test","model2_train","model2_test","model3_train","model3_test","model4_train","model4_test","model5_train","model5_test")
+#compare test RMSEs in five models
+ggplot(dataformodel, aes(size)) + 
+  geom_line(aes(y = model1_test, color="model1_test")) + 
+  geom_line(aes(y = model2_test, color="model2_test"))+ 
+  geom_line(aes(y = model3_test, color="model3_test"))+ 
+  geom_line(aes(y = model4_test, color="model4_test"))+ 
+  geom_line(aes(y = model5_test, color="model5_test"))
+#compare train RMSEs in five models
+ggplot(dataformodel, aes(size)) + 
+  geom_line(aes(y = model1_train, color="model1_train")) + 
+  geom_line(aes(y = model2_train, color="model2_train"))+ 
+  geom_line(aes(y = model3_train, color="model3_train"))+ 
+  geom_line(aes(y = model4_train, color="model4_train"))+ 
+  geom_line(aes(y = model5_train, color="model5_train"))
+```
+
+**Q**: Explain what new features you designed and why you chose them.
+
+**A**: I used interactions between "whether the movie is comedy or not" with "whether budget is greater than 3M or not" bacause my assumption is that gross will be larger if a comedy cost more.In addition, i compared five models. The model was improved slightly.
