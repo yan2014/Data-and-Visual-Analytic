@@ -1,3 +1,7 @@
+#In this assignment, you will get to know the R programming language by experimenting
+#with examples from the reading and implementing an algorithm in multiple ways using R.
+#You will then compare run times (time complexity) for your functions with a built-in R function.
+
 #1.	Get Familiar with R
 print("Hello, Shiyan Jiang")
 i=0
